@@ -1,0 +1,39 @@
+apiVersion: templates.gatekeeper.sh/v1beta1
+kind: ConstraintTemplate
+metadata:
+  name: k8srequiredregistry
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sRequiredRegistry
+      validation:
+        # Schema for the `parameters` field
+        openAPIV3Schema:
+          properties:
+            minimum:
+              type: integer
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8srequiredregistry
+        replicas := input.review.object.spec.replicas
+        print(replicas)
+        minimum := input.parameters.minimum
+        deployment_name := input.review.object.metadata.name
+        violation[{"msg": msg, "details": {"minimum replicas should be": minimum}}]{
+            replicas <= minimum
+          msg := sprintf("The Deployment %v could not be created because it requests %v replicas which is less than the minimum %v",[deployment_name,replicas,minimum])
+        }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredRegistry
+metadata:
+  name: helloworld-minimum-replicas
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["ReplicaSet"]
+  parameters:
+    minimum: 3
